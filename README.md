@@ -1,4 +1,4 @@
-# Byte Pair Encoder
+# Word Piece Model (WPM) light version
 
 For train, 
 
