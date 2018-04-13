@@ -1,30 +1,63 @@
+from collections import Counter
+from collections import defaultdict
+
 class BytePairEncoder:
     
-    def __init__(self, num_units=10):
-        self.num_units = num_units if num_units > 0 else 10
+    def __init__(self, n_iters=10, verbose=True):
+        self.n_iters = n_iters if n_iters > 0 else 10
         self.units = {}
         self.max_length = 0
+        self.verbose = verbose
         
     def train(self, sents):
-        def to_subwords(s):
-            s = s.replace('_', '') + '_'
-            n = len(s)
-            return [s[b:b+r] for b in range(n) for r in range(1, n+1) if b+r <= n]
-
-        def counting(sents):
-            from collections import Counter
-            return Counter((subword for sent in sents for eojeol in sent.split() for subword in to_subwords(eojeol) if eojeol))
-
-        counter = counting(sents)
-        a_syllables = {subword:freq for subword, freq in counter.items() if len(subword) == 1}
-        self.units = dict(
-            sorted(
-                filter(lambda x:len(x[0]) > 1, counter.items()), 
-                key=lambda x:(-x[1], -len(x[0]), x[0]))
-            [:max(0, self.num_units - len(a_syllables))]
-        )
-        self.units.update(a_syllables)
-        self.max_length = max((len(w) for w in self.units))
+        if self.verbose:
+            print('begin vocabulary scanning', end='', flush=True)
+        
+        vocabs = self._sent_to_vocabs(sents)
+        if self.verbose:
+            print('\rterminated vocabulary scanning', flush=True)
+        
+        self.units = self._build_subword_units(vocabs)
+    
+    def _sent_to_vocabs(self, sents):        
+        vocabs = Counter((eojeol.replace('_', '') for sent in sents for eojeol in sent.split() if eojeol))
+        return {' '.join(w) + ' _': c for w,c in vocabs.items() if w}
+        
+    def _build_subword_units(self, vocabs):
+        def get_stats(vocabs):
+            pairs = defaultdict(int)
+            for word, freq in vocabs.items():
+                symbols = word.split()
+                for i in range(len(symbols)-1):
+                    pairs[(symbols[i],symbols[i+1])] += freq
+            return pairs
+        
+        def merge_vocab(pair, v_in):
+            v_out = {}
+            bigram = ' '.join(pair)
+            replacer = ''.join(pair)
+            for word, freq in v_in.items():
+                w_out = word.replace(bigram, replacer)
+                v_out[w_out] = freq
+            return v_out
+        
+        for i in range(self.n_iters + 1):
+            pairs = get_stats(vocabs)
+            if not pairs:
+                break
+            best = max(pairs, key=pairs.get)
+            vocabs = merge_vocab(best, vocabs)
+            if self.verbose and i % 100 == 99:
+                print('\rtraining bpe {} / {}'.format(i+1, self.n_iters), end='', flush=True)
+        if self.verbose:
+            print('\rtraining bpe was done{}'.format(' '*40))
+        
+        units = {}
+        for word, freq in vocabs.items():
+            for unit in word.split():
+                units[unit] = units.get(unit, 0) + freq
+        self.max_length = max((len(w) for w in units))
+        return units
     
     def tokenize(self, s):
         return ' '.join([self._tokenize(w) for w in s.split()])
@@ -63,7 +96,7 @@ class BytePairEncoder:
     
     def save(self, fname):
         with open(fname, 'w', encoding='utf-8') as f:
-            f.write('num_units={}\n'.format(self.num_units))
+            f.write('n_iters={}\n'.format(self.n_iters))
             f.write('max_length={}\n'.format(self.max_length))
             for unit, frequency in sorted(self.units.items(), key=lambda x:(-x[1], -len(x[0]))):
                 f.write('{}\t{}\n'.format(unit, frequency))
@@ -71,7 +104,7 @@ class BytePairEncoder:
     def load(self, fname):
         with open(fname, encoding='utf-8') as f:
             try:
-                self.num_units = int(next(f).strip().split('=')[1])
+                self.n_iters = int(next(f).strip().split('=')[1])
                 self.max_length = int(next(f).strip().split('=')[1])
             except Exception as e:
                 print(e)
