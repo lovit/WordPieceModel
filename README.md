@@ -4,8 +4,8 @@ For train,
 
 	from bytepairencoder import BytePairEncoder
 
-	n_units = 5000
-	encoder = BytePairEncoder(n_units)
+	n_iters = 5000
+	encoder = BytePairEncoder(n_iters)
 	encoder.train(corpus)
 
 For tokenization, 
@@ -31,4 +31,4 @@ Example is model that trained from 2016-10-20 news articles with n_units=5000
 
 Result is
 
-	오 패 산 터 널_ 총 격 전_ 용 의자 _ 검 거_ 서울_ 연합뉴스_ 경찰_ 관계 자들이_ 19일_ 오후_ 서울_ 강 북 구_ 오 패 산_ 터 널_ 인근 에서_ 사제 _ 총 기를_ 발사 해_ 경찰 을_ 살 해 한_ 용 의자 _ 성 모 씨를_ 검 거 하고_ 있다_ 성 씨는_ 검 거_ 당시_ 서 바이 벌_ 게임 에서_ 쓰 는_ 방탄 조 끼 에_ 헬 멧 까지_ 착 용한_ 상태 였다_
+	오패산터널_ 총격전_ 용의자_ 검거_ 서울_ 연합뉴스_ 경찰_ 관계자들이_ 19일_ 오후_ 서울_ 강북구_ 오패산_ 터널_ 인근에서_ 사제_ 총기를_ 발사해_ 경찰을_ 살해한_ 용의자_ 성 모 씨를_ 검거하고_ 있다_ 성씨는_ 검거_ 당시_ 서바이벌_ 게임에서_ 쓰는_ 방탄조끼에_ 헬멧까지_ 착용한_ 상태였다_ 독자제공_ 영상_ 캡처_ 연합뉴스_ 서울_ 연합뉴스_ 김 은 경_ 기자_ 사제_ 총기로_ 경찰을_ 살해한_ 범 인_ 성 모_ 4 6_ 씨는_ 주도 면밀 했다_ 경찰에_ 따르면_ 성씨는_ 19일_ 오후_ 강북경찰서_ 인근_ 부 ...
