@@ -157,7 +157,6 @@ def indexing(vocab2count):
     def initialize(vocab2count):
         return {' '.join(vocab)+' _':count for vocab, count in vocab2count.items()}
 
-    uni2vocab = defaultdict(lambda: set())
     bi2vocab = defaultdict(lambda: set())
     bi2count = defaultdict(int)
     vocab2count = initialize(vocab2count)
@@ -165,10 +164,8 @@ def indexing(vocab2count):
         for bi in to_bi(vocab):
             bi2vocab[bi].add(vocab)
             bi2count[bi] += count
-        for uni in vocab.split():
-            uni2vocab[uni].add(vocab)
     sum_count = lambda vocabs: sum(vocab2count[v] for v in vocabs)
-    return uni2vocab, bi2vocab, bi2count, vocab2count
+    return bi2vocab, bi2count, vocab2count
 
 def unitify(vocab2count):
     units = defaultdict(int)
@@ -178,7 +175,7 @@ def unitify(vocab2count):
     return dict(units)
 
 def train_fast(vocab2count, num_merge, verbose):
-    uni2vocab, bi2vocab, bi2count, vocab2count = indexing(vocab2count)
+    bi2vocab, bi2count, vocab2count = indexing(vocab2count)
 
     for i in range(num_merge):
         bi_merge, _ = sorted(bi2count.items(), key=lambda x:(-x[1], x[0]))[0]
