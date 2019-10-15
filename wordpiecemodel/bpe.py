@@ -3,14 +3,16 @@ from collections import defaultdict
 
 class BytePairEncoder:
 
-    def __init__(self, n_iters=10, verbose=True, method='origin'):
+    def __init__(self, sents_or_vocab2count, n_iters=10, verbose=True, method='origin'):
         self.n_iters = n_iters if n_iters > 0 else 10
         self.units = {}
         self.max_length = 0
         self.verbose = verbose
         self.method = method
 
-    def train(self, sents_or_vocab2count):
+        self._train(sents_or_vocab2count)
+
+    def _train(self, sents_or_vocab2count):
         if self.verbose:
             print('begin vocabulary scanning', end='', flush=True)
 
@@ -18,6 +20,7 @@ class BytePairEncoder:
             vocab2count = sents_or_vocab2count
         else:
             vocab2count = sent_to_vocabs(sents_or_vocab2count)
+
         if self.verbose:
             print('\rterminated vocabulary scanning', flush=True)
 
