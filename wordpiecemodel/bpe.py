@@ -41,7 +41,10 @@ class BytePairEncoder:
         if self.verbose:
             print('\rterminated vocabulary scanning', flush=True)
 
-        self.units, self.max_length = train(vocab2count, self.num_merge, self.verbose)
+        if self.method == 'origin':
+            self.units, self.max_length = train(vocab2count, self.num_merge, self.verbose)
+        else:
+            self.units, self.max_length = train_fast(vocab2count, self.num_merge, self.verbose)
 
     def tokenize(self, s):
         return ' '.join([self._tokenize(w) for w in s.split()])
@@ -124,20 +127,93 @@ def train(vocabs, n_iters, verbose):
         return v_out
 
     vocabs = {' '.join(w)+' _':c for w, c in vocabs.items()}
-    for i in range(n_iters + 1):
+    for i in range(n_iters):
         pairs = get_stats(vocabs)
         if not pairs:
             break
         best, frequency = sorted(pairs.items(), key=lambda x:(-x[1], x[0]))[0]
         vocabs = merge_vocab(best, vocabs)
-        if verbose and i % 100 == 99:
-            print('\rtraining bpe {} / {}'.format(i+1, n_iters), end='', flush=True)
-    if verbose:
-        print('\rtraining bpe was done{}'.format(' '*40))
+        if verbose:
+            print('merged {} / {} : {}'.format(i+1, n_iters, best))
 
     units = {}
     for word, freq in vocabs.items():
         for unit in word.split():
             units[unit] = units.get(unit, 0) + freq
     max_length = max((len(w) for w in units))
+    return units, max_length
+
+def merge(vocab, bi):
+    before = ' '.join(bi)
+    after = ''.join(bi)
+    return vocab.replace(before, after)
+
+def to_bi(word):
+    word = word.split()
+    n = len(word)
+    return [tuple(word[i:i+2]) for i in range(n-1)]
+
+def indexing(vocab2count):
+    def initialize(vocab2count):
+        return {' '.join(vocab)+' _':count for vocab, count in vocab2count.items()}
+
+    uni2vocab = defaultdict(lambda: set())
+    bi2vocab = defaultdict(lambda: set())
+    bi2count = defaultdict(int)
+    vocab2count = initialize(vocab2count)
+    for vocab, count in vocab2count.items():
+        for bi in to_bi(vocab):
+            bi2vocab[bi].add(vocab)
+            bi2count[bi] += count
+        for uni in vocab.split():
+            uni2vocab[uni].add(vocab)
+    sum_count = lambda vocabs: sum(vocab2count[v] for v in vocabs)
+    return uni2vocab, bi2vocab, bi2count, vocab2count
+
+def unitify(vocab2count):
+    units = defaultdict(int)
+    for vocab, count in vocab2count.items():
+        for unit in vocab.split():
+            units[unit] += count
+    return dict(units)
+
+def train_fast(vocab2count, num_merge, verbose):
+    uni2vocab, bi2vocab, bi2count, vocab2count = indexing(vocab2count)
+
+    for i in range(num_merge):
+        bi_merge, _ = sorted(bi2count.items(), key=lambda x:(-x[1], x[0]))[0]
+        if verbose:
+            print('merged {} / {} : {}'.format(i+1, num_merge, bi_merge))
+
+        # find removals and updates
+        removal = []
+        update = []
+        for vocab_before in bi2vocab[bi_merge]:
+            vocab_after = merge(vocab_before, bi_merge)
+            count = vocab2count.pop(vocab_before)
+            vocab2count[vocab_after] = count
+            for old_bi in to_bi(vocab_before):
+                removal.append((old_bi, vocab_before, count))
+            for new_bi in to_bi(vocab_after):
+                update.append((new_bi, vocab_after, count))
+
+        # remove and decrease count
+        for old_bi, vocab_before, count in removal:
+            bi2count[old_bi] -= count
+            bi2vocab[old_bi].discard(vocab_before)
+
+        # update and increase count
+        for new_bi, vocab_after, count in update:
+            bi2count[new_bi] += count
+            bi2vocab[new_bi].add(vocab_after)
+
+        # remove useless values
+        for old_bi, _, _ in removal:
+            if bi2count[old_bi] == 0:
+                bi2count.pop(old_bi)
+            if not bi2vocab[old_bi]:
+                bi2vocab.pop(old_bi)
+
+    units = unitify(vocab2count)
+    max_length = max(len(unit) for unit in units)
     return units, max_length
