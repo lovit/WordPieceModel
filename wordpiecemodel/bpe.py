@@ -3,10 +3,27 @@ from collections import defaultdict
 
 class BytePairEncoder:
 
-    def __init__(self, sents_or_vocab2count, n_iters=10, verbose=True, method='origin'):
-        self.n_iters = n_iters if n_iters > 0 else 10
+    """
+    Arguments
+    ---------
+    sents_or_vocab2count : list of str or {str:int}
+        If the input is sentences, the form of input should be list of str (or like)
+        If the input is count of vocabulary, the form of input should be {vocab:count}
+    num_merge : int
+        The number of units.
+    verbose : Boolean
+        If True, it shows progress
+    method : str
+        Choice of ['origin', 'fast']
+    """
+    def __init__(self, sents_or_vocab2count, num_merge=10, verbose=True, method='origin'):
+
+        if num_merge <= 0:
+            raise ValueError('num_merge should be positive integer')
+
+        self.num_merge = num_merge
         self.units = {}
-        self.max_length = 0
+        self.max_length = -1
         self.verbose = verbose
         self.method = method
 
@@ -24,7 +41,7 @@ class BytePairEncoder:
         if self.verbose:
             print('\rterminated vocabulary scanning', flush=True)
 
-        self.units, self.max_length = train(vocab2count, self.n_iters, self.verbose)
+        self.units, self.max_length = train(vocab2count, self.num_merge, self.verbose)
 
     def tokenize(self, s):
         return ' '.join([self._tokenize(w) for w in s.split()])
@@ -111,7 +128,7 @@ def train(vocabs, n_iters, verbose):
         pairs = get_stats(vocabs)
         if not pairs:
             break
-        best = max(pairs, key=pairs.get)
+        best, frequency = sorted(pairs.items(), key=lambda x:(-x[1], x[0]))[0]
         vocabs = merge_vocab(best, vocabs)
         if verbose and i % 100 == 99:
             print('\rtraining bpe {} / {}'.format(i+1, n_iters), end='', flush=True)
